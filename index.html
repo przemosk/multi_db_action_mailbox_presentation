@@ -4,7 +4,7 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-		<title>reveal.js</title>
+		<title>Re-platforming Ruby on Rails web apps</title>
 
 		<link rel="stylesheet" href="css/reset.css">
 		<link rel="stylesheet" href="css/reveal.css">
@@ -25,8 +25,343 @@
 	<body>
 		<div class="reveal">
 			<div class="slides">
-				<section>Slide 1</section>
-				<section>Slide 2</section>
+				 <section data-background-image="img/bg.png">
+						<section>
+							<h3>Re-platforming Ruby on Rails web apps</h3>
+						</section>
+				 </section> <!-- SLIDE 1 --> 
+
+
+
+<!-- ############ START ACTION MAILBOX SECTION ############### -->
+				<section data-background-image="img/bg.png">
+				<h3>Action Mailbox</h3>
+
+				<div style="width: 100%; height: 100%; float: left;">
+          <img src="img/mailbox.jpg" border="0" height="350px" class="custom_image_style">
+        </div>
+
+			</section> <!-- SLIDE 8 -->
+
+			<section data-background-image="img/bg.png">
+					<p>Use case:</p>
+					<span>We would like to turn customers email sended on our support@spree.com email address into tickets entry</span>
+			</section> <!-- SLIDE 9 -->
+
+			<section data-background-image="img/bg.png">
+					<p>What we have to do:</p>
+					<ul>
+						<li>Add entry point for our app (ingress)</li>
+						<li>Catch email sent to support@spree.com</li>
+						<li>Create Ticket entry</li>
+						<li>Send confirmation email to customer</li>
+					</ul>
+			</section> <!-- SLIDE 9 -->
+
+			<section data-background-image="img/bg.png">
+					<p>First, let's install !</p>
+								<section>
+									<pre>
+										<code data-trim data-noescape>
+$ bin/rails action_mailbox:install
+$ bin/rails db:migrate
+										</code>
+									</pre>
+
+<span> Will add some table to our database: </span> 
+									<pre>
+										<code data-trim data-noescape>
+1. ActionMailbox::InboundEmail
+2. ActiveStorage::Blob 
+3. ActiveStorage::Attachment
+										</code>
+									</pre>
+								</section>
+			</section> <!-- SLIDE 9 -->
+
+
+			<section data-background-image="img/bg.png">
+					<p>Ingresses</p>
+
+							<p>External</p>
+							<ul style="width: 100%">
+								<li>Mailgun</li>
+								<li>Mandrill</li>
+								<li>Postmark</li>
+								<li>SendGrid</li>
+							</ul>
+
+
+							<span style="width: 100%">Bult-in:</span>
+							<ul style="width: 100%">
+								<li>Exim</li>
+								<li>Postfix</li>
+								<li>Qmail </li>
+							</ul>
+			</section> <!-- SLIDE 9 -->
+
+			<section data-background-image="img/bg.png">
+					<p>Let's inbound some emails</p>
+
+									<pre>
+										<code data-trim data-noescape>
+# app/mailboxes/application_mailbox.rb
+class ApplicationMailbox < ActionMailbox::Base
+
+	# Any of the recipients of the mail (whether to, cc, bcc) are matched against the regexp.
+  routing /^support@/i => :support_ticket
+
+  # Any of the recipients of the mail (whether to, cc, bcc) needs to be an exact match for the string.
+  routing 'help@example.com' => :help
+
+  # We can use (proc, lambda), to pass incoming email like a param and determine in mehtod if should be processed 
+  routing ->(inbound_email) { with_sku?(inbound_email) } => :price_finder
+
+  def self.with_sku?(inbound_email)
+    inbound_email.mail.subject.include?('SKU') || inbound_email.mail.body.include?('SKU')
+  end
+end
+										</code>
+									</pre>
+			</section> <!-- SLIDE 9 -->
+
+
+			<section data-background-image="img/bg.png">
+					<p>Time to process</p>
+									<pre>
+										<code data-trim data-noescape>
+# app/mailboxes/support_ticket_mailbox.rb
+class SupportTicketMailbox < ApplicationMailbox
+  def process
+    CreateTicketService.new(
+    	title: mail.subject, 
+    	email: mail.from.first, 
+    	message: mail.decode_body).call
+
+    TicketConfirmationJob(mail.from.first).deliver_now
+  end
+end
+										</code>
+									</pre>
+
+									<pre>
+										<code data-trim data-noescape>
+ActionMailbox::InboundEmail.statuses
+{"pending"=>0, "processing"=>1, "delivered"=>2, "failed"=>3, "bounced"=>4}
+										</code>
+									</pre>
+			</section> <!-- SLIDE 9 -->
+
+
+			<section data-background-image="img/bg.png">
+					<p>What about privacy?</p>
+
+									<pre>
+										<code data-trim data-noescape>
+config.action_mailbox.incinerate_after = 30.days # default
+										</code>
+									</pre>
+			</section> <!-- SLIDE 9 -->
+
+
+
+			<section data-background-image="img/bg.png">
+					<p>Our use case in real app ... :)</p>
+			</section> <!-- SLIDE 9 -->
+
+<!-- ############ END ACTION MAILBOX SECTION ############### -->
+
+	
+<!-- ############ START MULTI DB SECTION ############### -->
+				<section data-background-image="img/bg.png">
+						<h3>Multiple databases with AR</h3>
+				</section> <!-- SLIDE 2 --> 
+
+				<section data-background-image="img/bg.png">
+							<h3>What we have?</h3>
+				</section> <!-- SLIDE --> 
+
+				<section data-background-image="img/bg.png">
+							<section>
+							<p>Multiple primary databases and a replica for each</p>
+									<pre>
+										<code data-trim data-noescape>
+											development:
+											  primary:
+											    database: my_primary_database
+											    user: root
+											    adapter: mysql
+											  primary_replica:
+											    database: my_primary_database
+											    user: root_readonly
+											    adapter: mysql
+											    replica: true
+											  archived_orders:
+											    database: my_archived_orders_db
+											    user: archived_orders_root
+											    adapter: mysql
+											    migrations_paths: db/archived_orders_migrate
+											  archived_orders_replica:
+											    database: my_archived_orders_db
+											    user: archived_orders_readonly
+											    adapter: mysql
+											    replica: true
+										</code>
+									</pre>
+							</section>
+				</section> <!-- SLIDE 3 --> 
+
+
+				<section data-background-image="img/bg.png">
+							<section>
+							<p>Automatic connection switching for the model:</p>
+									<pre>
+										<code data-trim data-noescape>
+											class ApplicationRecord < ActiveRecord::Base
+											  self.abstract_class = true
+
+											  connects_to database: { writing: :primary, reading: :primary_replica }
+											end
+										</code>
+									</pre>
+							</section>
+				</section> <!-- SLIDE 4 --> 
+
+				<section data-background-image="img/bg.png">
+							<section>
+							<p>Horizontal sharding:</p>
+
+									<pre>
+										<code data-trim data-noescape>
+development:
+  primary:
+    database: my_primary_database
+    adapter: mysql
+  primary_replica:
+    database: my_primary_database
+    adapter: mysql
+    replica: true
+  primary_shard_one:
+    database: my_primary_shard_one
+    adapter: mysql
+  primary_shard_one_replica:
+    database: my_primary_shard_one
+    adapter: mysql
+    replica: true
+										</code>
+									</pre>
+							</section>
+				</section> <!-- SLIDE 6 --> 
+
+
+								<section data-background-image="img/bg.png">
+							<section>
+								<p>Horizontal sharding in model:</p>
+									<pre>
+										<code data-trim data-noescape>
+class ApplicationRecord < ActiveRecord::Base
+  self.abstract_class = true
+
+  connects_to shards: {
+    default: { writing: :primary, reading: :primary_replica },
+    shard_one: { writing: :primary_shard_one, reading: :primary_shard_one_replica }
+  }
+end
+										</code>
+									</pre>
+							</section>
+				</section> <!-- SLIDE 6 --> 
+
+
+				<section data-background-image="img/bg.png">
+							<section>
+							<p>Automatic swapping between the primary and replica</p>
+									<pre>
+										<code data-trim data-noescape>
+# config/application.rb
+config.active_record.database_selector = { delay: 2.seconds }
+config.active_record.database_resolver = 
+ActiveRecord::Middleware::DatabaseSelector::Resolver
+config.active_record.database_resolver_context = 
+ActiveRecord::Middleware::DatabaseSelector::Resolver::Session
+
+# we can define our custom Resolver class
+config.active_record.database_selector = { delay: 2.seconds }
+config.active_record.database_resolver = MyResolver
+config.active_record.database_operations = MyResolver::MySession
+										</code>
+									</pre>
+							</section>
+				</section> <!-- SLIDE 5 --> 
+
+
+				<section data-background-image="img/bg.png">
+							<section>
+								<p>Rails tasks</p>
+									<pre>
+										<code data-trim data-noescape>
+rails db:create: primary 
+rails db:create: my_archived_orders_db
+
+rails db:migrate: primary 
+rails db:migrate: my_archived_orders_db
+
+
+rails db:drop: primary
+rails db:drop: my_archived_orders_db
+
+rails generate migration 
+CreateArchivedPayment number:string --database my_archived_orders_db
+										</code>
+									</pre>
+							</section>
+				</section> <!-- SLIDE 6 --> 
+
+				<section data-background-image="img/bg.png">
+						<h3>We have to wait for ... ?</h3>
+				</section> <!-- SLIDE -->
+
+				<section data-background-image="img/bg.png">
+							<section>
+								<ul>
+									<li>Automatic swapping for horizontal sharding</li>
+									<li>Load balancing replicas</li>
+									<li>Dumping schema caches for multiple databases</li>
+								</ul>
+							</section>
+				</section> <!-- SLIDE 7 --> 
+
+				<section data-background-image="img/bg.png">
+						<h3>Let's improve our database</h3>
+				</section> <!-- SLIDE -->
+
+<!-- ############ END MULTI DB SECTION ############### -->
+
+			<section data-background-image="img/bg.png">
+				<h3>Summary</h3>
+			</section>
+
+			<section data-background-image="img/bg.png">
+				<p>Action Mailbox</p>
+				<p>We are able to automate some processes related to communication with our customers</p>
+			</section>
+
+
+			<section data-background-image="img/bg.png">
+				<p>Multi database</p>
+				<ul>
+					<li>Extract piece of main database and move to another one</li>
+					<li>Split a table into multiple databases ( horizontal sharding )</li>
+					<li>We can manage requests traffic into database by them type</li>
+				</ul>
+			</section>
+
+
+			<section data-background-image="img/bg.png">
+				<h3>THANK YOU ! :) </h3>
+				<p style="font-weight: bold">April 16th: Instagram feed integration with an E-Commerce web app</p>
+			</section>
+
 			</div>
 		</div>
 
@@ -38,6 +373,7 @@
 			// - https://github.com/hakimel/reveal.js#dependencies
 			Reveal.initialize({
 				hash: true,
+				margin: 0.0,
 				dependencies: [
 					{ src: 'plugin/markdown/marked.js' },
 					{ src: 'plugin/markdown/markdown.js' },

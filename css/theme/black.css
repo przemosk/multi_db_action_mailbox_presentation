@@ -101,7 +101,9 @@ body {
   list-style-type: decimal; }
 
 .reveal ul {
-  list-style-type: disc; }
+    list-style: none;
+    font-size: 75%;
+}
 
 .reveal ul ul {
   list-style-type: square; }
@@ -149,7 +151,7 @@ body {
   font-family: monospace;
   line-height: 1.2em;
   word-wrap: break-word;
-  box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.15); }
+}
 
 .reveal code {
   font-family: monospace;
@@ -159,8 +161,11 @@ body {
   display: block;
   padding: 5px;
   overflow: auto;
-  max-height: 400px;
-  word-wrap: normal; }
+  max-height: 430px;
+  word-wrap: normal;
+  font-size: 17px;
+  line-height: 20px;
+}
 
 .reveal table {
   margin: auto;
